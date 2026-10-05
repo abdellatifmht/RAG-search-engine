@@ -18,21 +18,33 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     Returns:
         list[dict]: A list of matching movies.
     """
-    movies = load_movies()
     results = []
     stop_words = load_stop_words()
+
+    inverted_index = InvertedIndex.load()
+    index = inverted_index.index
+    docmap = inverted_index.docmap
+
+    if not index or not docmap:
+        print("Inverted index is empty. Please build the index first.")
+        exit(1)
 
     query_tokens = tokenize_text(query)
     query_tokens = remove_stop_words(query_tokens, stop_words)
 
-    for movie in movies:
-        title_tokens = tokenize_text(movie["title"])
-        title_tokens = remove_stop_words(title_tokens, stop_words)
-        if has_matching_token(title_tokens, query_tokens):
-            results.append(movie)
-            if len(results) >= limit:
-                break
-
+    for query_token in query_tokens:
+        if query_token in index:
+            doc_ids = inverted_index.get_documents(query_token)
+            for doc_id in doc_ids:
+                if doc_id in docmap:
+                    movie = docmap[doc_id]
+                    if movie not in results:
+                        results.append(movie)
+                if len(results) >= limit:
+                    break
+        if len(results) >= limit:
+            break
+            
     return results
 
 
@@ -109,8 +121,8 @@ def remove_stop_words(tokens: list[str], stop_words: list[str]) -> list[str]:
 class InvertedIndex:
     """A class representing an inverted index for efficient keyword search."""
     def __init__(self):
-        self.index = defaultdict(list)
-        self.docmap = defaultdict(list)
+        self.index = defaultdict(set)
+        self.docmap = {}
         self.index_path = os.path.join(CACHE_PATH, "index.pkl")
         self.docmap_path = os.path.join(CACHE_PATH, "docmap.pkl")
 
@@ -118,17 +130,18 @@ class InvertedIndex:
         """Add a document ID to the inverted index for a given token."""
         tokens = tokenize_text(text)
         for token in tokens:
-            self.index[token].append(doc_id)
-            self.docmap[doc_id] = token
+            self.index[token].add(doc_id)
 
     def get_documents(self, term: str) -> list[int]:
         """Retrieve the list of document IDs associated with a given term."""
-        return sorted(self.index.get(term, []))
+        doc_ids = self.index.get(term, set())
+        return sorted(list(doc_ids))
 
     def build(self):
         movies = load_movies()
         for movie in movies:
             doc_id = movie["id"]
+            self.docmap[doc_id] = movie
             content = f"{movie['title']} {movie['description']}"
             self._add_document(doc_id, content)
 

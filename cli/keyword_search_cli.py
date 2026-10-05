@@ -13,10 +13,11 @@ def main() -> None:
 
     match args.command:
         case "search":
+            
             print('Searching for:', args.query)
             results = search_command(args.query)
             for i, res in enumerate(results, start=1):
-                print(f"{i}. {res['title']}")
+                print(f"{i}. {res['id']}: {res['title']}")
         case "build":
             print('Building the inverted index...')
             build_command()

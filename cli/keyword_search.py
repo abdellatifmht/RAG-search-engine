@@ -1,10 +1,112 @@
 from nltk.stem import PorterStemmer
-from collections import defaultdict
+from collections import defaultdict, Counter
 from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, CACHE_PATH, load_movies
 import string
 import pickle
 import os
 
+
+class InvertedIndex:
+    """A class representing an inverted index for efficient keyword search."""
+    def __init__(self):
+        self.index = defaultdict(set)
+        self.docmap = {}
+        self.term_frequencies = defaultdict(Counter)
+        self.index_path = os.path.join(CACHE_PATH, "index.pkl")
+        self.docmap_path = os.path.join(CACHE_PATH, "docmap.pkl")
+        self.term_freq_path = os.path.join(CACHE_PATH, "term_frequencies.pkl")
+
+    def _add_document(self, doc_id: int, text: str):
+        """Add a document ID to the inverted index for a given token."""
+        tokens = tokenize_text(text)
+        self.term_frequencies[doc_id].update(tokens)
+        for token in tokens:
+            self.index[token].add(doc_id)
+
+    def get_documents(self, term: str) -> list[int]:
+        """Retrieve the list of document IDs associated with a given term."""
+        doc_ids = self.index.get(term, set())
+        return sorted(list(doc_ids))
+
+    def get_tf(self, doc_id: int, term: str) -> int:
+        """Get the term frequency of a term in a specific document."""
+        return self.term_frequencies[doc_id].get(term, 0)
+
+    def build(self):
+        movies = load_movies()
+        for movie in movies:
+            doc_id = movie["id"]
+            self.docmap[doc_id] = movie
+            content = f"{movie['title']} {movie['description']}"
+            self._add_document(doc_id, content)
+
+    def save(self):
+        """Save the inverted index to a pickle file."""
+        os.makedirs(CACHE_PATH, exist_ok=True)
+        with open(self.index_path, "wb") as f:
+            pickle.dump(self.index, f)
+
+        with open(self.docmap_path, "wb") as f:
+            pickle.dump(self.docmap, f)
+
+        with open(self.term_freq_path, "wb") as f:
+            pickle.dump(self.term_frequencies, f)
+
+
+    @classmethod
+    def load(cls):
+        """Load the inverted index from a pickle file."""
+        index = cls()
+        with open(index.index_path, "rb") as f:
+            index.index = pickle.load(f)
+
+        with open(index.docmap_path, "rb") as f:
+            index.docmap = pickle.load(f)
+
+        with open(index.term_freq_path, "rb") as f:
+            index.term_frequencies = pickle.load(f)
+
+        return index
+
+
+def build_command() -> None:
+    index = InvertedIndex()
+    index.build()
+    index.save()
+
+
+def get_term_frequency(doc_id: int, term: str) -> int:
+    """
+    Get the term frequency of a term in a specific document.
+    Args:
+        doc_id (int): The document ID.
+        term (str): The term to get frequency for.
+    Returns:
+        int: The term frequency of the term in the document.
+    """
+    inverted_index = InvertedIndex.load()
+    term_frequency = inverted_index.term_frequencies
+    if not term_frequency:
+        print("Term frequencies are empty. Please build the index first.")
+        exit(1)
+    term = tokenize_term(term)
+    return inverted_index.get_tf(doc_id, term)
+
+
+def tokenize_term(term: str) -> str:
+    """
+    Tokenize a single term.
+    Args:
+        term (str): The input term to tokenize.
+    Returns:
+        str: The tokenized term.
+    """
+    tokens = tokenize_text(term)
+
+    if len(tokens) != 1:
+        raise ValueError(f"Expected a single token, but got {len(tokens)} tokens: {tokens}")
+
+    return tokens[0]
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
@@ -79,20 +181,20 @@ def tokenize_text(text: str) -> list[str]:
     return valid_tokens
 
 
-def has_matching_token(title_tokens: list[str], query_tokens: list[str]) -> bool:
-    """
-    Check if the title contains any of the keywords from the query.
-    Args:
-        title_tokens (list[str]): The tokenized movie title.
-        query_tokens (list[str]): The tokenized search query.
-    Returns:
-        bool: True if there is a match, False otherwise.
-    """
-    for query_token in query_tokens:
-        for title_token in title_tokens:
-            if query_token in title_token:
-                return True
-    return False
+# def has_matching_token(title_tokens: list[str], query_tokens: list[str]) -> bool:
+#     """
+#     Check if the title contains any of the keywords from the query.
+#     Args:
+#         title_tokens (list[str]): The tokenized movie title.
+#         query_tokens (list[str]): The tokenized search query.
+#     Returns:
+#         bool: True if there is a match, False otherwise.
+#     """
+#     for query_token in query_tokens:
+#         for title_token in title_tokens:
+#             if query_token in title_token:
+#                 return True
+#     return False
 
 
 def load_stop_words() -> list[str]:
@@ -116,58 +218,3 @@ def remove_stop_words(tokens: list[str], stop_words: list[str]) -> list[str]:
         list[str]: A list of tokens with stop words removed.
     """
     return [token for token in tokens if token not in stop_words]
-
-
-class InvertedIndex:
-    """A class representing an inverted index for efficient keyword search."""
-    def __init__(self):
-        self.index = defaultdict(set)
-        self.docmap = {}
-        self.index_path = os.path.join(CACHE_PATH, "index.pkl")
-        self.docmap_path = os.path.join(CACHE_PATH, "docmap.pkl")
-
-    def _add_document(self, doc_id: int, text: str):
-        """Add a document ID to the inverted index for a given token."""
-        tokens = tokenize_text(text)
-        for token in tokens:
-            self.index[token].add(doc_id)
-
-    def get_documents(self, term: str) -> list[int]:
-        """Retrieve the list of document IDs associated with a given term."""
-        doc_ids = self.index.get(term, set())
-        return sorted(list(doc_ids))
-
-    def build(self):
-        movies = load_movies()
-        for movie in movies:
-            doc_id = movie["id"]
-            self.docmap[doc_id] = movie
-            content = f"{movie['title']} {movie['description']}"
-            self._add_document(doc_id, content)
-
-    def save(self):
-        """Save the inverted index to a pickle file."""
-        os.makedirs(CACHE_PATH, exist_ok=True)
-        with open(self.index_path, "wb") as f:
-            pickle.dump(self.index, f)
-
-        with open(self.docmap_path, "wb") as f:
-            pickle.dump(self.docmap, f)
-
-    @classmethod
-    def load(cls):
-        """Load the inverted index from a pickle file."""
-        index = cls()
-        with open(index.index_path, "rb") as f:
-            index.index = pickle.load(f)
-
-        with open(index.docmap_path, "rb") as f:
-            index.docmap = pickle.load(f)
-
-        return index
-
-
-def build_command() -> None:
-    index = InvertedIndex()
-    index.build()
-    index.save()

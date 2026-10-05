@@ -1,10 +1,11 @@
 import argparse
-import json
-from keyword_search import search_command
+from keyword_search import search_command, build_command
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers.add_parser("build", help="Build the inverted index from the movie dataset")
+
     search_parser = subparsers.add_parser("search", help="Search movies using keywords")
     search_parser.add_argument("query", type=str, help="Search query")
 
@@ -16,6 +17,10 @@ def main() -> None:
             results = search_command(args.query)
             for i, res in enumerate(results, start=1):
                 print(f"{i}. {res['title']}")
+        case "build":
+            print('Building the inverted index...')
+            build_command()
+            print('Inverted index built and saved successfully.')
         case _:
             parser.print_help()
 

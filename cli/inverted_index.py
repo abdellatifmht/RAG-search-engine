@@ -1,3 +1,2 @@
-class InvertedIndex:
-    """A class representing an inverted index for efficient keyword search."""
-    
+from search_utils import load_movies, CACHE_INDEX_PATH, CACHE_DOCMAP_PATH
+import pickle

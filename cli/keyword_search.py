@@ -1,6 +1,8 @@
 from nltk.stem import PorterStemmer
-from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, load_movies
+from collections import defaultdict
+from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, CACHE_PATH, load_movies
 import string
+import pickle
 import os
 
 
@@ -102,3 +104,57 @@ def remove_stop_words(tokens: list[str], stop_words: list[str]) -> list[str]:
         list[str]: A list of tokens with stop words removed.
     """
     return [token for token in tokens if token not in stop_words]
+
+
+class InvertedIndex:
+    """A class representing an inverted index for efficient keyword search."""
+    def __init__(self):
+        self.index = defaultdict(list)
+        self.docmap = defaultdict(list)
+        self.index_path = os.path.join(CACHE_PATH, "index.pkl")
+        self.docmap_path = os.path.join(CACHE_PATH, "docmap.pkl")
+
+    def _add_document(self, doc_id: int, text: str):
+        """Add a document ID to the inverted index for a given token."""
+        tokens = tokenize_text(text)
+        for token in tokens:
+            self.index[token].append(doc_id)
+            self.docmap[doc_id] = token
+
+    def get_documents(self, term: str) -> list[int]:
+        """Retrieve the list of document IDs associated with a given term."""
+        return sorted(self.index.get(term, []))
+
+    def build(self):
+        movies = load_movies()
+        for movie in movies:
+            doc_id = movie["id"]
+            content = f"{movie['title']} {movie['description']}"
+            self._add_document(doc_id, content)
+
+    def save(self):
+        """Save the inverted index to a pickle file."""
+        os.makedirs(CACHE_PATH, exist_ok=True)
+        with open(self.index_path, "wb") as f:
+            pickle.dump(self.index, f)
+
+        with open(self.docmap_path, "wb") as f:
+            pickle.dump(self.docmap, f)
+
+    @classmethod
+    def load(cls):
+        """Load the inverted index from a pickle file."""
+        index = cls()
+        with open(index.index_path, "rb") as f:
+            index.index = pickle.load(f)
+
+        with open(index.docmap_path, "rb") as f:
+            index.docmap = pickle.load(f)
+
+        return index
+
+
+def build_command() -> None:
+    index = InvertedIndex()
+    index.build()
+    index.save()

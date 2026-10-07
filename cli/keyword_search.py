@@ -1,3 +1,5 @@
+import math
+
 from nltk.stem import PorterStemmer
 from collections import defaultdict, Counter
 from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, CACHE_PATH, load_movies
@@ -100,6 +102,8 @@ def tokenize_term(term: str) -> str:
         term (str): The input term to tokenize.
     Returns:
         str: The tokenized term.
+    Raises:
+        ValueError: If the input term does not result in exactly one token.
     """
     tokens = tokenize_text(term)
 
@@ -108,6 +112,31 @@ def tokenize_term(term: str) -> str:
 
     return tokens[0]
 
+def calculate_idf(token: str, inverted_index: InvertedIndex) -> float:
+    """
+    Calculate the inverse document frequency (IDF) for a given token.
+    Args:
+        token (str): The token to calculate IDF for.
+        inverted_index (InvertedIndex): The inverted index instance.
+    Returns:
+        float: The IDF value for the token.
+    """
+    total_docs = len(inverted_index.docmap)
+    doc_freq = len(inverted_index.get_documents(token))
+    
+    return math.log((total_docs + 1) / (doc_freq + 1))
+
+def idf_command(term: str) -> float:
+    """
+    Calculate the inverse document frequency (IDF) for a given term.
+    Args:
+        term (str): The term to calculate IDF for.
+    Returns:
+        float: The IDF value for the term.
+    """
+    inverted_index = InvertedIndex.load()
+    term = tokenize_term(term)
+    return calculate_idf(term, inverted_index)
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     """

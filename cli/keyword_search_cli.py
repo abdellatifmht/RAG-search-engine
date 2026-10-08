@@ -1,4 +1,5 @@
 import argparse
+from search_utils import BM25_K1
 from keyword_search import (
     search_command,
     build_command,
@@ -6,6 +7,7 @@ from keyword_search import (
     idf_command,
     tfidf_command,
     bm25_idf_command,
+    bm25_tf_command,
     )
 
 def main() -> None:
@@ -39,6 +41,16 @@ def main() -> None:
         "bm25idf", help="Get BM25 IDF score for a given term"
     )
     bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF score for")
+
+    # Add subparsers for bm25_tf command
+    bm25_tf_parser = subparsers.add_parser(
+    "bm25tf", help="Get BM25 TF score for a given document ID and term"
+    )
+    bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
+    bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
+    bm25_tf_parser.add_argument(
+        "k1", type=float, nargs="?", default=BM25_K1, help="Tunable BM25 K1 parameter"
+    )
 
     args = parser.parse_args()
 
@@ -78,6 +90,14 @@ def main() -> None:
                 print(f"BM25 IDF score of '{args.term}': {bm25idf:.2f}")
             except ValueError as e:
                 print(f"Error: {e}")
+
+        case "bm25tf":
+            try:
+                bm25tf = bm25_tf_command(args.doc_id, args.term, args.k1)
+                print(f"BM25 TF score of '{args.term}' in document '{args.doc_id}': {bm25tf:.2f}")
+            except ValueError as e:
+                print(f"Error: {e}")
+
         case _:
             parser.print_help()
 

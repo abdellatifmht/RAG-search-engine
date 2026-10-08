@@ -2,7 +2,7 @@ import math
 
 from nltk.stem import PorterStemmer
 from collections import defaultdict, Counter
-from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, CACHE_PATH, load_movies
+from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, CACHE_PATH, load_movies, BM25_K1
 import string
 import pickle
 import os
@@ -53,6 +53,11 @@ class InvertedIndex:
         total_docs = len(self.docmap)
         doc_freq = len(self.get_documents(term))
         return math.log((total_docs - doc_freq + 0.5) / (doc_freq + 0.5) + 1)
+
+    def get_bm25_tf(self, doc_id: int, term: str, k1=BM25_K1):
+        tf = self.get_tf(doc_id, term)
+        bm25_tf = (tf * (k1 + 1)) / (tf + k1)
+        return bm25_tf
 
     def save(self):
         """Save the inverted index to a pickle file."""
@@ -188,6 +193,20 @@ def bm25_idf_command(term: str) -> float:
     inverted_index = InvertedIndex.load()
     token = tokenize_term(term)
     return inverted_index.get_bm25_idf(token)
+
+def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1) -> float:
+    """
+    Calculate the BM25 term frequency (TF) for a given term in a specific document.
+    Args:
+        doc_id (int): The document ID.
+        term (str): The term to calculate BM25 TF for.
+        k1 (float): The BM25 k1 parameter.
+    Returns:
+        float: The BM25 TF value for the term in the document.
+    """
+    inverted_index = InvertedIndex.load()
+    token = tokenize_term(term)
+    return inverted_index.get_bm25_tf(doc_id, token, k1)
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     """

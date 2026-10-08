@@ -42,6 +42,18 @@ class InvertedIndex:
             content = f"{movie['title']} {movie['description']}"
             self._add_document(doc_id, content)
 
+    def get_bm25_idf(self, term: str) -> float:
+        """
+        Calculate the BM25 inverse document frequency (IDF) for a given term.
+        Args:
+            term (str): The term to calculate IDF for.
+        Returns:
+            float: The BM25 IDF value for the term.
+        """
+        total_docs = len(self.docmap)
+        doc_freq = len(self.get_documents(term))
+        return math.log((total_docs - doc_freq + 0.5) / (doc_freq + 0.5) + 1)
+
     def save(self):
         """Save the inverted index to a pickle file."""
         os.makedirs(CACHE_PATH, exist_ok=True)
@@ -53,7 +65,6 @@ class InvertedIndex:
 
         with open(self.term_freq_path, "wb") as f:
             pickle.dump(self.term_frequencies, f)
-
 
     @classmethod
     def load(cls):
@@ -137,6 +148,46 @@ def idf_command(term: str) -> float:
     inverted_index = InvertedIndex.load()
     term = tokenize_term(term)
     return calculate_idf(term, inverted_index)
+
+def calculate_tfidf(doc_id: int, token: str, inverted_index: InvertedIndex) -> float:
+    """
+    Calculate the TF-IDF score for a given term in a specific document.
+    Args:
+        doc_id (int): The document ID.
+        term (str): The term to calculate TF-IDF for.
+        inverted_index (InvertedIndex): The inverted index instance.
+    Returns:
+        float: The TF-IDF score for the term in the document.
+    """
+    tf = inverted_index.get_tf(doc_id, token)
+    idf = calculate_idf(token, inverted_index)
+    return tf * idf
+
+
+def tfidf_command(doc_id: int, term: str) -> float:
+    """
+    Calculate the TF-IDF score for a given term in a specific document.
+    Args:
+        doc_id (int): The document ID.
+        term (str): The term to calculate TF-IDF for.
+    Returns:
+        float: The TF-IDF score for the term in the document.
+    """
+    inverted_index = InvertedIndex.load()
+    token = tokenize_term(term)
+    return calculate_tfidf(doc_id, token, inverted_index) 
+
+def bm25_idf_command(term: str) -> float:
+    """
+    Calculate the BM25 inverse document frequency (IDF) for a given term.
+    Args:
+        term (str): The term to calculate BM25 IDF for.
+    Returns:
+        float: The BM25 IDF value for the term.
+    """
+    inverted_index = InvertedIndex.load()
+    token = tokenize_term(term)
+    return inverted_index.get_bm25_idf(token)
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     """

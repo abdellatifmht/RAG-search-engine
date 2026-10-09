@@ -22,7 +22,9 @@ class InvertedIndex:
 
     def _add_document(self, doc_id: int, text: str):
         """Add a document ID to the inverted index for a given token."""
-        tokens = tokenize_text(text)
+        stop_words = load_stop_words()
+        tokens = remove_stop_words(tokenize_text(text), stop_words)
+
         self.doc_lengths[doc_id] = len(tokens)
         self.term_frequencies[doc_id].update(tokens)
         for token in tokens:
@@ -74,6 +76,27 @@ class InvertedIndex:
         length_norm = 1 - b + b * (doc_length / avg_doc_length)
         bm25_tf = (tf * (k1 + 1)) / (tf + k1 * length_norm) if tf > 0 else 0.0
         return bm25_tf
+
+    def bm25(self, doc_id: int, term: str) -> float:
+        """Calculate the BM25 score for a given term in a specific document."""
+        bm25_idf = self.get_bm25_idf(term)
+        bm25_tf = self.get_bm25_tf(doc_id, term)
+        return bm25_idf * bm25_tf
+
+    def bm25_search(self, query: str, limit: int=DEFAULT_SEARCH_LIMIT) -> list[tuple[dict, float]]:
+        """Search for documents using BM25 scoring."""
+        query_tokens = tokenize_text(query)
+        scores = defaultdict(float)
+
+        for token in query_tokens:
+            doc_ids = self.get_documents(token)
+            for doc_id in doc_ids:
+                scores[doc_id] += self.bm25(doc_id, token)
+
+        # Sort documents by score in descending order and limit the results
+        sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    
+        return [(self.docmap[doc_id], score) for doc_id, score in sorted_docs[:limit]]
 
     def __get_avg_doc_length(self) -> float:
         """Calculate the average document length in the index."""
@@ -237,6 +260,20 @@ def bm25_tf_command(doc_id: int, term: str, k1: float = BM25_K1, b: float = BM25
     token = tokenize_term(term)
     return inverted_index.get_bm25_tf(doc_id, token, k1, b)
 
+def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[tuple[dict, float]]:
+    """
+    Search for movies using BM25 scoring.
+
+    Args:
+        query (str): The search query.
+        limit (int): The maximum number of results to return.
+
+    Returns:
+        list[tuple[dict, float]]: A list of tuples containing matching movies and their BM25 scores.
+    """
+    inverted_index = InvertedIndex.load()
+    return inverted_index.bm25_search(query, limit)
+
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     """
     Search for movies using keywords.
@@ -333,7 +370,7 @@ def load_stop_words() -> list[str]:
     stop_words_path = os.path.join(PROJECT_ROOT, "data", "stopwords.txt")
     with open(stop_words_path, "r") as f:
         stop_words = f.read().splitlines()
-    return [preprocess_text(word) for word in stop_words]
+    return [token for word in stop_words for token in tokenize_text(word)]
 
 
 def remove_stop_words(tokens: list[str], stop_words: list[str]) -> list[str]:

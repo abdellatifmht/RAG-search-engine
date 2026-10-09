@@ -8,6 +8,7 @@ from keyword_search import (
     tfidf_command,
     bm25_idf_command,
     bm25_tf_command,
+    bm25_search_command,
     )
 
 def main() -> None:
@@ -55,6 +56,13 @@ def main() -> None:
     "b", type=float, nargs="?", default=BM25_B, help="Tunable BM25 b parameter"
     )
 
+    # Add subparsers for bm25search command
+    bm25search_parser = subparsers.add_parser(
+    "bm25search", help="Search movies using full BM25 scoring"
+    )
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+    bm25search_parser.add_argument("--limit", type=int, default=5, help="Limit the number of search results")
+
     args = parser.parse_args()
 
     match args.command:
@@ -101,6 +109,12 @@ def main() -> None:
             except ValueError as e:
                 print(f"Error: {e}")
 
+        case "bm25search":
+            print('Searching for:', args.query)
+            results = bm25_search_command(args.query, limit=args.limit)
+
+            for i, (doc, score) in enumerate(results, start=1):
+                print(f"{i}. ({doc['id']}) {doc['title']} - (Score: {score:.2f})")
         case _:
             parser.print_help()
 

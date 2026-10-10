@@ -2,8 +2,14 @@ import os
 from pydoc import doc
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from search_utils import CACHE_PATH, load_movies, DEFAULT_SEARCH_LIMIT
+from search_utils import CACHE_PATH, load_movies, DEFAULT_SEARCH_LIMIT, DEFAULT_CHUNK_SIZE, OVERLEAP_SIZE
+from typing import TypedDict
 
+
+class SemanticSearchResult(TypedDict):
+    score: float
+    title: str
+    description: str
 
 class SemanticSearch:
     """Class for performing semantic search using sentence transformers."""
@@ -51,7 +57,7 @@ class SemanticSearch:
 
         return self.build_embeddings(documents)
 
-    def search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
+    def search(self, query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[SemanticSearchResult]:
         """Search for documents similar to the query."""
         if not query.strip():
             raise ValueError("Query text cannot be empty.")
@@ -125,4 +131,28 @@ def search_documents(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> None:
 
     for i, doc in enumerate(results, start=1):
         print(f"{i}. {doc['title']} (Score: {doc['score']:.4f})")
-        print(doc['description'], end="\n\n")
+        print(doc['description'][:100] + "..." if len(doc['description']) > 100 else doc['description'], end="\n\n")
+
+def chunk_document(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE, overlap: int = OVERLEAP_SIZE) -> None:
+    """Chunk a document into smaller pieces."""
+    if not text.strip():
+        raise ValueError("Input text cannot be empty.")
+    if chunk_size <= 0:
+        raise ValueError("Chunk size must be a positive integer.")
+    if overlap < 0 or overlap >= chunk_size:
+        raise ValueError("Overlap must be a non-negative integer less than the chunk size.")
+
+    words = text.split()
+    chunks = []
+    step = chunk_size - overlap
+
+    for start in range(0, len(words), step):
+        chunk = words[start:start + chunk_size]
+
+        if chunk and len(chunk) <= overlap:
+            break
+        chunks.append(" ".join(chunk))
+
+    print(f"Chunking {len(text)} characters")
+    for i, chunk in enumerate(chunks, start=1):
+        print(f"{i}. {chunk}")

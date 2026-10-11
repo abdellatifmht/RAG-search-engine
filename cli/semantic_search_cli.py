@@ -1,11 +1,14 @@
 import argparse
 from lib.semantic_search import (
-    chunk_document,
+    chunk_command,
+    embed_chunks_command,
     embed_query_text,
+    semantic_chunk_command,
     search_documents,
     verify_model,
     embed_text,
-    verify_embeddings
+    verify_embeddings,
+    search_chunked_command,
     )
 
 def main() -> None:
@@ -37,6 +40,20 @@ def main() -> None:
     chunk_parser.add_argument("--chunk-size", type=int, default=200, help="Size of each chunk (default: 200 characters)")
     chunk_parser.add_argument("--overlap", type=int, default=40, help="Overlap between chunks (default: 40 characters)")
 
+    # Add a new subparser for semantic chunking
+    semantic_chunk_parser = subparsers.add_parser("semantic_chunk", help="Chunk a document semantically into smaller pieces")
+    semantic_chunk_parser.add_argument("text", type=str, help="Document text to chunk semantically")
+    semantic_chunk_parser.add_argument("--max-chunk-size", type=int, default=4, help="Maximum number of sentences in each chunk (default: 4)")
+    semantic_chunk_parser.add_argument("--overlap", type=int, default=0, help="Overlap between chunks in number of sentences (default: 0)")
+
+    # Add a new subparser for embedding all chunks in the database
+    subparsers.add_parser("embed_chunks", help="Generate embeddings for all chunks in the database")
+
+    # Add a new subparser for searching chunked documents
+    search_chunked_parser = subparsers.add_parser("search_chunked", help="Search for chunked documents similar to the query")
+    search_chunked_parser.add_argument("query", type=str, help="Query text to search for similar chunked documents")
+    search_chunked_parser.add_argument("--limit", type=int, default=5, help="Limit the number of search results (default: 5)")
+
     args = parser.parse_args()
 
     match args.command:
@@ -55,10 +72,29 @@ def main() -> None:
             embed_query_text(args.query)
 
         case "search":
-            search_documents(args.query, args.limit)
+            try:
+                search_documents(args.query, args.limit)
+            except Exception as e:
+                print(f"Error occurred while searching: {e}")
 
         case "chunk":
-            chunk_document(args.text, args.chunk_size, args.overlap)
+            try:
+                chunk_command(args.text, args.chunk_size, args.overlap)
+            except Exception as e:
+                print(f"Error occurred while chunking: {e}")
+
+        case "semantic_chunk":
+            try:
+                semantic_chunk_command(args.text, args.max_chunk_size, args.overlap)
+            except Exception as e:
+                print(f"Error occurred while semantic chunking: {e}")
+
+        case "embed_chunks":
+            print("Embedding chunks...")
+            embed_chunks_command()
+
+        case "search_chunked":
+            search_chunked_command(args.query, args.limit)
 
         case _:
             parser.print_help()

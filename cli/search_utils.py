@@ -1,6 +1,6 @@
 import os
 import json
-from typing import TypedDict
+from typing import Any, TypedDict
 
 
 class Movie(TypedDict):
@@ -8,11 +8,20 @@ class Movie(TypedDict):
     title: str
     description: str
 
+class SearchResult(TypedDict):
+    id: int
+    title: str
+    document: str
+    score: float
+    metadata: dict[str, Any]
+
 BM25_K1 = 1.5
 BM25_B = 0.75
 
 DEFAULT_SEARCH_LIMIT = 5
+SCORE_PRECISION = 3
 DEFAULT_CHUNK_SIZE = 200
+DOCUMENT_PREVIEW_LENGTH = 100
 OVERLEAP_SIZE = 40
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
@@ -24,3 +33,27 @@ def load_movies() -> list[Movie]:
     with open(DATA_PATH, "r") as f:
         data = json.load(f)
     return data["movies"]
+
+
+def format_search_result(
+    doc_id: int, title: str, document: str, score: float, **metadata: Any
+) -> SearchResult:
+    """Create standardized search result
+
+    Args:
+        doc_id: Document ID
+        title: Document title
+        document: Display text (usually short description)
+        score: Relevance/similarity score
+        **metadata: Additional metadata to include
+
+    Returns:
+        Dictionary representation of search result
+    """
+    return {
+        "id": doc_id,
+        "title": title,
+        "document": document,
+        "score": round(score, SCORE_PRECISION),
+        "metadata": metadata if metadata else {},
+    }

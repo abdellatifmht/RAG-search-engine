@@ -1,6 +1,6 @@
 import argparse
 from search_utils import BM25_B, BM25_K1
-from keyword_search import (
+from lib.keyword_search import (
     search_command,
     build_command,
     get_term_frequency,

@@ -1,7 +1,7 @@
 import os
 
-from keyword_search import InvertedIndex
-from semantic_search import ChunkedSemanticSearch
+from .keyword_search import InvertedIndex
+from .semantic_search import ChunkedSemanticSearch
 
 
 class HybridSearch:
@@ -24,3 +24,24 @@ class HybridSearch:
 
     def rrf_search(self, query: str, k: int, limit: int = 10) -> list[dict]:
         raise NotImplementedError("RRF hybrid search is not implemented yet.")
+
+
+def normalize_scores(scores: list[float]) -> list[float]:
+    """Normalize a list of scores to the range [0, 1].
+
+    Args:
+        scores: List of scores to normalize
+
+    Returns:
+        List of normalized scores
+    """
+    if not scores:
+        return []
+
+    min_score = min(scores)
+    max_score = max(scores)
+
+    if min_score == max_score:
+        return [1.0]
+
+    return [(score - min_score) / (max_score - min_score) for score in scores]

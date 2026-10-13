@@ -11,7 +11,7 @@ class Movie(TypedDict):
 class SearchResult(TypedDict):
     id: int
     title: str
-    document: str
+    description: str
     score: float
     metadata: dict[str, Any]
 
@@ -53,7 +53,7 @@ def format_search_result(
     return {
         "id": doc_id,
         "title": title,
-        "document": document,
+        "description": document,
         "score": round(score, SCORE_PRECISION),
         "metadata": metadata if metadata else {},
     }

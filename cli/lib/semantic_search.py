@@ -2,7 +2,6 @@ import os
 import re
 import numpy as np
 import json
-from pydoc import doc
 from sentence_transformers import SentenceTransformer
 from search_utils import (
     CACHE_PATH,
@@ -125,10 +124,10 @@ class ChunkedSemanticSearch(SemanticSearch):
             doc_chunks = semantic_chunk_document(doc['description'], max_chunk_size=4, overlap=1)
             chunks.extend(doc_chunks)
 
-            for chunk in doc_chunks:
+            for i, _ in enumerate(doc_chunks):
                 chunk_metadata.append({
                     "movie_idx": id,
-                    "chunk_idx": chunks.index(chunk),
+                    "chunk_idx": i,
                     "total_chunks": len(doc_chunks)
                 })
 
@@ -143,7 +142,7 @@ class ChunkedSemanticSearch(SemanticSearch):
 
         return self.chunk_embeddings
 
-    def search_chunks(self, query: str, limit: int = 10) -> list[dict]:
+    def search_chunks(self, query: str, limit: int = 10) -> list[SearchResult]:
         """Search for chunks similar to the query."""
         if not query.strip():
             raise ValueError("Query text cannot be empty.")
@@ -186,15 +185,14 @@ class ChunkedSemanticSearch(SemanticSearch):
         for movie_idx, chunk_score in sorted_movies[:limit]:
             movie = self.document_map[movie_idx]
 
-            movie["description"] = movie['description'][:DOCUMENT_PREVIEW_LENGTH]
-            movie["score"] = round(chunk_score['score'], 3)
+            movie["description"] = movie['description']
 
             results.append(
                 format_search_result(
-                    doc_id=movie_idx,
+                    doc_id=movie['id'],
                     title=movie['title'],
-                    document=movie['description'][:DOCUMENT_PREVIEW_LENGTH],
-                    score=movie['score'],
+                    document=movie['description'],
+                    score=chunk_score['score'],
                     )
             )
         return results
@@ -293,7 +291,7 @@ def chunk_document(text: str, chunk_size: int = DEFAULT_CHUNK_SIZE, overlap: int
     for start in range(0, len(words), step):
         chunk = words[start:start + chunk_size]
 
-        if chunk and len(chunk) <= overlap:
+        if start > 0 and len(chunk) <= overlap:
             break
         chunks.append(" ".join(chunk))
 
@@ -337,7 +335,7 @@ def semantic_chunk_document(text: str, max_chunk_size: int = 4, overlap: int = 0
     for start in range(0, len(sentences), step):
         chunk = sentences[start:start + max_chunk_size]
 
-        if chunk and len(chunk) <= overlap:
+        if start > 0 and len(chunk) <= overlap:
             break
         sentence_chunk = " ".join(chunk).strip()
 

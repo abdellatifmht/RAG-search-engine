@@ -2,14 +2,28 @@ import math
 
 from nltk.stem import PorterStemmer
 from collections import defaultdict, Counter
-from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, CACHE_PATH, load_movies, BM25_K1, BM25_B
+from search_utils import DEFAULT_SEARCH_LIMIT,PROJECT_ROOT, CACHE_PATH, SearchResult, format_search_result, load_movies, BM25_K1, BM25_B
 import string
 import pickle
 import os
 
 
 class InvertedIndex:
-    """A class representing an inverted index for efficient keyword search."""
+    """
+    A class representing an inverted index for efficient keyword search.
+    
+    Attributes
+    ----------
+        index (defaultdict): A dictionary mapping tokens to sets of document IDs.
+        docmap (dict): A dictionary mapping document IDs to document data.
+        term_frequencies (defaultdict): A dictionary mapping document IDs to term frequency counters.
+        doc_lengths (defaultdict): A dictionary mapping document IDs to their lengths.
+        index_path (str): Path to the file where the inverted index is saved.
+        docmap_path (str): Path to the file where the document map is saved.
+        term_freq_path (str): Path to the file where term frequencies are saved.
+        doc_lengths_path (str): Path to the file where document lengths are saved.
+    """
+
     def __init__(self):
         self.index = defaultdict(set)
         self.docmap = {}
@@ -83,8 +97,17 @@ class InvertedIndex:
         bm25_tf = self.get_bm25_tf(doc_id, term)
         return bm25_idf * bm25_tf
 
-    def bm25_search(self, query: str, limit: int=DEFAULT_SEARCH_LIMIT) -> list[tuple[dict, float]]:
-        """Search for documents using BM25 scoring."""
+    def bm25_search(self, query: str, limit: int=DEFAULT_SEARCH_LIMIT) -> list[SearchResult]:
+        """
+        Search for documents using BM25 scoring.
+        
+        Args:
+            query (str): The search query.
+            limit (int): The maximum number of results to return.
+
+        Returns:
+            list[SearchResult]: A list of search results.
+        """
         query_tokens = tokenize_text(query)
         scores = defaultdict(float)
 
@@ -96,7 +119,18 @@ class InvertedIndex:
         # Sort documents by score in descending order and limit the results
         sorted_docs = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     
-        return [(self.docmap[doc_id], score) for doc_id, score in sorted_docs[:limit]]
+        results = []
+        for doc_id, score in sorted_docs[:limit]:
+            movie = self.docmap[doc_id]
+            result = format_search_result(
+                doc_id=doc_id,
+                title=movie["title"],
+                document=movie["description"],
+                score=score,
+            )
+            results.append(result)
+
+        return results
 
     def __get_avg_doc_length(self) -> float:
         """Calculate the average document length in the index."""
@@ -119,23 +153,19 @@ class InvertedIndex:
         with open(self.doc_lengths_path, "wb") as f:
             pickle.dump(self.doc_lengths, f)
 
-    @classmethod
-    def load(cls):
+    def load(self):
         """Load the inverted index, document map, term frequencies, and document lengths from pickle files."""
-        index = cls()
-        with open(index.index_path, "rb") as f:
-            index.index = pickle.load(f)
+        with open(self.index_path, "rb") as f:
+            self.index = pickle.load(f)
 
-        with open(index.docmap_path, "rb") as f:
-            index.docmap = pickle.load(f)
+        with open(self.docmap_path, "rb") as f:
+            self.docmap = pickle.load(f)
 
-        with open(index.term_freq_path, "rb") as f:
-            index.term_frequencies = pickle.load(f)
+        with open(self.term_freq_path, "rb") as f:
+            self.term_frequencies = pickle.load(f)
 
-        with open(index.doc_lengths_path, "rb") as f:
-            index.doc_lengths = pickle.load(f)
-
-        return index
+        with open(self.doc_lengths_path, "rb") as f:
+            self.doc_lengths = pickle.load(f)
 
 
 def build_command() -> None:
@@ -271,7 +301,8 @@ def bm25_search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[t
     Returns:
         list[tuple[dict, float]]: A list of tuples containing matching movies and their BM25 scores.
     """
-    inverted_index = InvertedIndex.load()
+    inverted_index = InvertedIndex()
+    inverted_index.load()
     return inverted_index.bm25_search(query, limit)
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:

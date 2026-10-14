@@ -66,11 +66,25 @@ class HybridSearch:
         return combined[:limit]
 
     def rrf_search(
-        self, query: str, k: int, limit: int = 10
-    ) -> list[WeightedSearchResult]:
-        raise NotImplementedError(
-            "RRF hybrid search is not implemented yet."
+        self, query: str, k: int = 60, limit: int = 5
+    ) -> list[dict]:
+        if limit <= 0:
+            return []
+
+        if k <= 0:
+            raise ValueError("k doit être supérieur à 0.")
+
+        bm25_results = self._bm25_search(query, limit * 500)
+        semantic_results = self.semantic_search.search_chunks(
+            query, limit * 500
         )
+
+        combined = combined_rrf_results(
+            bm25_results,
+            semantic_results,
+            k,
+        )
+        return combined[:limit]
 
 
 def normalize_scores(scores: list[float]) -> list[float]:
@@ -108,6 +122,10 @@ def hybrid_score(
 ) -> float:
     """Combine les scores BM25 et sémantique."""
     return alpha * bm25_score + (1 - alpha) * semantic_score
+
+
+def rrf_score(rank: int, k: int = 60) -> float:
+    return 1 / (k + rank)
 
 
 def combine_search_results(
@@ -198,4 +216,94 @@ def weighted_hybrid_search_command(
             f"   BM25: {result['bm25_score']:.3f}, "
             f"Semantic: {result['semantic_score']:.3f}"
         )
+        print(f"   {result['description'][:100]}...\n")
+
+
+def combined_rrf_results(
+    bm25_results: list[dict],
+    semantic_results: list[dict],
+    k: int = 60,
+) -> list[dict]:
+    """Fusionne les résultats BM25 et sémantiques avec RRF."""
+
+    ranked_bm25 = rank_scores(bm25_results)
+    ranked_semantic = rank_scores(semantic_results)
+
+    combined_scores: dict[int, dict] = {}
+
+    def get_entry(result: dict) -> dict:
+        doc_id = result["id"]
+
+        if doc_id not in combined_scores:
+            combined_scores[doc_id] = {
+                "id": doc_id,
+                "title": result["title"],
+                "description": result["description"],
+                "bm25_score": 0.0,
+                "semantic_score": 0.0,
+                "rrf_score": 0.0,
+                "bm25_rank": None,
+                "semantic_rank": None,
+            }
+
+        return combined_scores[doc_id]
+
+    # Résultats BM25
+    for rank, result in ranked_bm25:
+        entry = get_entry(result)
+
+        entry["bm25_rank"] = rank
+        entry["rrf_score"] += rrf_score(rank, k)
+
+        entry["bm25_score"] = result["score"]
+
+    # Résultats sémantiques
+    for rank, result in ranked_semantic:
+        entry = get_entry(result)
+
+        if (
+            entry["semantic_rank"] is None
+            or rank < entry["semantic_rank"]
+        ):
+            old_rank = entry["semantic_rank"]
+
+            if old_rank is not None:
+                entry["rrf_score"] -= rrf_score(old_rank, k)
+
+            entry["semantic_rank"] = rank
+            entry["rrf_score"] += rrf_score(rank, k)
+
+        entry["semantic_score"] = max(
+            entry["semantic_score"],
+            result["score"],
+        )
+
+    return sorted(
+        combined_scores.values(),
+        key=lambda item: item["rrf_score"],
+        reverse=True,
+    )
+
+
+def rank_scores(results: list[dict]) -> list[tuple[int, dict]]:
+    """Classe les résultats par score et limite le nombre de résultats."""
+    sorted_results = sorted(results, key=lambda x: x["score"], reverse=True)
+    return [(rank + 1, result) for rank, result in enumerate(sorted_results, start=1)]
+
+
+def rrf_hybrid_search_command(
+    query: str,
+    k: int = 60,
+    limit: int = 5,
+) -> None:
+    """Effectue une recherche RRF et affiche les résultats."""
+    documents = load_movies()
+    hybrid_search = HybridSearch(documents)
+
+    combined = hybrid_search.rrf_search(query, k, limit)
+
+    for i, result in enumerate(combined, start=1):
+        print(f"{i}. ({result['title']})")
+        print(f"   RRF Score: {result['rrf_score']:.3f}")
+        print(f"   BM25 Rank: {result.get('bm25_rank', 'N/A')}, Semantic Rank: {result.get('semantic_rank', 'N/A')}")
         print(f"   {result['description'][:100]}...\n")

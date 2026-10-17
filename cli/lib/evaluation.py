@@ -1,6 +1,22 @@
 from .hybrid_search import HybridSearch
 from search_utils import load_movies, load_golden_dataset
-from .semantic_search import SemanticSearch
+import os
+import json
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
+api_key = os.environ.get("OPENROUTER_API_KEY")
+if not api_key:
+    raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
+
+client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=api_key,
+)
+model = "openrouter/free"
+
+# class LLMSearchResult(SearchResult, total=False):
 
 def precision_at_k(retrieved: list[str], relevant: set[str], k: int) -> float:
     """Calculate precision at k.

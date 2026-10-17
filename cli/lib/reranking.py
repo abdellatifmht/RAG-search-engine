@@ -173,3 +173,57 @@ def rerank(
 
     else:
         return documents[:limit]
+
+
+def llm_evaluate_results(query: str, results: list[dict]) -> list[dict]:
+    """Evaluate the search results using an LLM.
+
+    Args:
+        query: The search query.
+        results: List of search results.
+
+    Returns:
+        List of evaluated search results with additional scores.
+    """
+    formatted_results = [
+        f"{i + 1}. Title: {result.get('title', 'N/A')}, Description: {result.get('description', 'N/A')}"
+        for i, result in enumerate(results)
+    ]
+    prompt = f"""Rate how relevant each result is to this query on a 0-3 scale:
+
+                Query: "{query}"
+
+                Results:
+                {chr(10).join(formatted_results)}
+
+                Scale:
+                - 3: Highly relevant
+                - 2: Relevant
+                - 1: Marginally relevant
+                - 0: Not relevant
+
+                Do NOT give any numbers other than 0, 1, 2, or 3.
+
+                Return ONLY the scores in the same order you were given the documents. Return a valid JSON list, nothing else. For example:
+
+                [2, 0, 3, 2, 0, 1]"""
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    scores_text = (response.choices[0].message.content or "").strip()
+    try:
+        scores = json.loads(scores_text)
+        if not isinstance(scores, list) or not all(isinstance(score, int) for score in scores):
+            raise ValueError("Expected a JSON list of integers")
+    except (json.JSONDecodeError, ValueError):
+        # If the model returns invalid JSON, return the original results without scores
+        return results
+
+    # Add the scores to the results
+    for result, score in zip(results, scores):
+        result["llm_score"] = score
+
+    results = sorted(results, key=lambda x: x.get("llm_score", 0), reverse=True)
+    return results

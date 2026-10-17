@@ -38,6 +38,11 @@ def main() -> None:
         choices=["individual", "batch", "cross_encoder"],
         help="Reranking method to use",
     )
+    rrf_search_parser.add_argument(
+        "--evaluate",
+        action="store_true",
+        help="Evaluate the search results using llm-eval",
+    )
 
     args = parser.parse_args()
 
@@ -53,7 +58,7 @@ def main() -> None:
             weighted_hybrid_search_command(args.query, args.alpha, args.limit)
 
         case "rrf-search":
-            result = rrf_search_command(args.query, args.k, args.enhance, args.rerank_method, args.limit)
+            result = rrf_search_command(args.query, args.k, args.enhance, args.rerank_method, args.evaluate, args.limit)
 
             if result["enhanced_query"]:
                 print(
@@ -68,7 +73,7 @@ def main() -> None:
             )
 
             for i, res in enumerate(result["results"], 1):
-                print(f"{i}. {res['title']}")
+                print(f"{i}. {res['title']}: {res.get('llm_score', 'N/A')}/3")
                 if res.get("individual_score") is not None:
                     print(f"   Rerank Score: {res['individual_score']:.3f}/10")
 

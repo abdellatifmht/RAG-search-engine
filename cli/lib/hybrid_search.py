@@ -1,12 +1,13 @@
 import os
 from typing import Literal, TypedDict
 
-from lib.reranking import rerank
+from lib.reranking import rerank, llm_evaluate_results
 from lib.query_enhacement import enhance_query
 
 from .keyword_search import InvertedIndex
 from .semantic_search import ChunkedSemanticSearch
 from search_utils import DEFAULT_SEARCH_LIMIT, SearchResult, format_search_result, load_movies, RRF_K
+
 
 
 class WeightedSearchResult(TypedDict):
@@ -324,6 +325,7 @@ def rrf_search_command(
     k: int = RRF_K,
     enhance: Literal["spell", "rewrite"] | None = None,
     rerank_method: Literal["individual"] | None = None,
+    evaluate: bool = False,
     limit: int = DEFAULT_SEARCH_LIMIT,
 ) -> RRFSearchCommandResult:
     movies = load_movies()
@@ -340,6 +342,9 @@ def rrf_search_command(
 
     if rerank_method:
         results = rerank(query, results, rerank_method, limit)
+
+    if evaluate:
+        results = llm_evaluate_results(query, results)
 
     return {
         "original_query": original_query,

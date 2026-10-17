@@ -36,7 +36,7 @@ class ChunkScore(TypedDict):
 
 class SemanticSearch:
     """Class for performing semantic search using sentence transformers."""
-    def __init__(self):
+    def __init__(self, ):
         """Initialize the SemanticSearch class with a pre-trained model."""
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
         self.embeddings = None
@@ -184,8 +184,6 @@ class ChunkedSemanticSearch(SemanticSearch):
         results: list[SearchResult] = []
         for movie_idx, chunk_score in sorted_movies[:limit]:
             movie = self.document_map[movie_idx]
-
-            movie["description"] = movie['description']
 
             results.append(
                 format_search_result(
@@ -375,4 +373,4 @@ def search_chunked_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> Non
 
     for i, movie in enumerate(results, start=1):
         print(f"\n{i}. {movie['title']} (score: {movie['score']:.4f})")
-        print(f"   {movie['document'][:DOCUMENT_PREVIEW_LENGTH]}...")
+        print(f"   {movie['description'][:DOCUMENT_PREVIEW_LENGTH]}...")

@@ -15,8 +15,16 @@ class SearchResult(TypedDict):
     score: float
     metadata: dict[str, Any]
 
+class GoldenTestCase(TypedDict):
+    query: str
+    relevant_docs: list[str]
+
+class GoldenDataset(TypedDict):
+    test_cases: list[GoldenTestCase]
+
 BM25_K1 = 1.5
 BM25_B = 0.75
+RRF_K = 60
 
 DEFAULT_SEARCH_LIMIT = 5
 SCORE_PRECISION = 3
@@ -27,6 +35,7 @@ OVERLEAP_SIZE = 40
 PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 DATA_PATH = os.path.join(PROJECT_ROOT, "data", "movies.json")
 CACHE_PATH = os.path.join(PROJECT_ROOT, "cache")
+GOLDEN_DATASET_PATH = os.path.join(PROJECT_ROOT, "data", "golden_dataset.json")
 
 
 def load_movies() -> list[Movie]:
@@ -57,3 +66,9 @@ def format_search_result(
         "score": round(score, SCORE_PRECISION),
         "metadata": metadata if metadata else {},
     }
+
+
+def load_golden_dataset() -> GoldenDataset:
+    with open(GOLDEN_DATASET_PATH, "r") as f:
+        data = json.load(f)
+    return data

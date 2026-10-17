@@ -1,6 +1,5 @@
 import argparse
-from lib.hybrid_search import normalize_scores, weighted_hybrid_search_command, rrf_hybrid_search_command
-from query_enhacement import enhance_query
+from lib.hybrid_search import normalize_scores, weighted_hybrid_search_command, rrf_search_command, rerank
 
 
 def main() -> None:
@@ -21,12 +20,23 @@ def main() -> None:
     rrf_search_parser = subparser.add_parser("rrf-search", help="Perform a Reciprocal Rank Fusion (RRF) search")
     rrf_search_parser.add_argument("query", type=str, help="Query text to search for")
     rrf_search_parser.add_argument("-k", type=int, default=60, help="K value for RRF (default: 60)")
-    rrf_search_parser.add_argument("--limit", type=int, default=5, help="Limit the number of search results (default: 5)")
+    rrf_search_parser.add_argument(
+        "--limit",
+        type=int,
+        default=5,
+        help="Limit the number of search results (default: 5)"
+    )
     rrf_search_parser.add_argument(
         "--enhance",
         type=str,
         choices=["spell", "rewrite", "expand"],
         help="Query enhancement method",
+    )
+    rrf_search_parser.add_argument(
+        "--rerank-method",
+        type=str,
+        choices=["individual", "batch", "cross_encoder"],
+        help="Reranking method to use",
     )
 
     args = parser.parse_args()
@@ -43,11 +53,42 @@ def main() -> None:
             weighted_hybrid_search_command(args.query, args.alpha, args.limit)
 
         case "rrf-search":
-            if args.enhance:
-                enhanced_query = enhance_query(args.query, args.enhance)
-                print(f"Enhanced query ({args.enhance}): '{args.query}' -> '{enhanced_query}'\n")
+            result = rrf_search_command(args.query, args.k, args.enhance, args.rerank_method, args.limit)
 
-            rrf_hybrid_search_command(enhanced_query, args.k, args.limit)
+            if result["enhanced_query"]:
+                print(
+                    f"Enhanced query ({result['enhance_method']}): '{result['original_query']}' -> '{result['enhanced_query']}'\n"
+                )
+
+            if result["rerank_method"]:
+                print(f"Re-ranking top {len(result['results'])} results using {result['rerank_method']} method...")
+
+            print(
+                f"Reciprocal Rank Fusion Results for '{result['query']}' (k={result['k']}):"
+            )
+
+            for i, res in enumerate(result["results"], 1):
+                print(f"{i}. {res['title']}")
+                if res.get("individual_score") is not None:
+                    print(f"   Rerank Score: {res['individual_score']:.3f}/10")
+
+                if res.get("batch_rank"):
+                    print(f"   Re-rank Rank: {res['batch_rank']}")
+
+                if res.get("cross_encoder_score") is not None:
+                    print(f"   Cross Encoder Score: {res['cross_encoder_score']:.3f}")
+
+                print(f"   RRF Score: {res.get('score', 0):.3f}")
+                ranks = []
+                metadata = res.get("metadata", {})
+                if metadata.get("bm25_rank"):
+                    ranks.append(f"BM25 Rank: {metadata['bm25_rank']}")
+                if metadata.get("semantic_rank"):
+                    ranks.append(f"Semantic Rank: {metadata['semantic_rank']}")
+                if ranks:
+                    print(f"   {', '.join(ranks)}")
+                print(f"   {res['description'][:100]}...")
+                print()
 
         case _:
             parser.print_help()

@@ -1,9 +1,12 @@
 import os
-from typing import TypedDict
+from typing import Literal, TypedDict
+
+from lib.reranking import rerank
+from lib.query_enhacement import enhance_query
 
 from .keyword_search import InvertedIndex
 from .semantic_search import ChunkedSemanticSearch
-from search_utils import load_movies
+from search_utils import DEFAULT_SEARCH_LIMIT, SearchResult, format_search_result, load_movies, RRF_K
 
 
 class WeightedSearchResult(TypedDict):
@@ -21,6 +24,16 @@ class CombinedScoreData(TypedDict):
     bm25_score: float
     description: str
     semantic_score: float
+
+class RRFSearchCommandResult(TypedDict):
+    original_query: str
+    enhanced_query: str | None
+    enhance_method: Literal["spell", "rewrite", "expand"] | None
+    rerank_method: Literal["individual"] | None
+    query: str
+    k: int
+    results: list[dict]
+
 
 
 class HybridSearch:
@@ -278,11 +291,26 @@ def combined_rrf_results(
             result["score"],
         )
 
-    return sorted(
-        combined_scores.values(),
-        key=lambda item: item["rrf_score"],
+    sorted_items =  sorted(
+        combined_scores.items(),
+        key=lambda item: item[1]["rrf_score"],
         reverse=True,
     )
+
+    rrf_results: list[SearchResult] = []
+    for doc_id, data in sorted_items:
+        result = format_search_result(
+            doc_id=doc_id,
+            title=data["title"],
+            document=data["description"],
+            score=data["rrf_score"],
+            rrf_score=data["rrf_score"],
+            bm25_rank=data["bm25_rank"],
+            semantic_rank=data["semantic_rank"],
+        )
+        rrf_results.append(result)
+
+    return rrf_results
 
 
 def rank_scores(results: list[dict]) -> list[tuple[int, dict]]:
@@ -291,19 +319,34 @@ def rank_scores(results: list[dict]) -> list[tuple[int, dict]]:
     return [(rank + 1, result) for rank, result in enumerate(sorted_results, start=1)]
 
 
-def rrf_hybrid_search_command(
+def rrf_search_command(
     query: str,
-    k: int = 60,
-    limit: int = 5,
-) -> None:
-    """Effectue une recherche RRF et affiche les résultats."""
-    documents = load_movies()
-    hybrid_search = HybridSearch(documents)
+    k: int = RRF_K,
+    enhance: Literal["spell", "rewrite"] | None = None,
+    rerank_method: Literal["individual"] | None = None,
+    limit: int = DEFAULT_SEARCH_LIMIT,
+) -> RRFSearchCommandResult:
+    movies = load_movies()
+    searcher = HybridSearch(movies)
 
-    combined = hybrid_search.rrf_search(query, k, limit)
+    original_query = query
+    enhanced_query = None
+    if enhance:
+        enhanced_query = enhance_query(query, method=enhance)
+        query = enhanced_query
 
-    for i, result in enumerate(combined, start=1):
-        print(f"{i}. ({result['title']})")
-        print(f"   RRF Score: {result['rrf_score']:.3f}")
-        print(f"   BM25 Rank: {result.get('bm25_rank', 'N/A')}, Semantic Rank: {result.get('semantic_rank', 'N/A')}")
-        print(f"   {result['description'][:100]}...\n")
+    search_limit = limit
+    results = searcher.rrf_search(query, k, search_limit)
+
+    if rerank_method:
+        results = rerank(query, results, rerank_method, limit)
+
+    return {
+        "original_query": original_query,
+        "enhanced_query": enhanced_query,
+        "enhance_method": enhance,
+        "rerank_method": rerank_method,
+        "query": query,
+        "k": k,
+        "results": results,
+    }

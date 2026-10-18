@@ -312,3 +312,5 @@ when evaluating a different catalogue.
 
 No license has been selected yet. Add a `LICENSE` file before publishing the
 repository if you want others to use, modify, or redistribute the project.
+
+[![Boot.dev Learn Retrieval Augmented Generation certificate](https://qvault-webapp-dynamic-assets.storage.googleapis.com/certificates/0d23b904-07bc-4e7e-b0e3-ea7077ddbc39.jpeg?v=1792347782)](https://www.boot.dev/certificates/0d23b904-07bc-4e7e-b0e3-ea7077ddbc39)

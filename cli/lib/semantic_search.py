@@ -36,7 +36,7 @@ class ChunkScore(TypedDict):
 
 class SemanticSearch:
     """Class for performing semantic search using sentence transformers."""
-    def __init__(self, ):
+    def __init__(self):
         """Initialize the SemanticSearch class with a pre-trained model."""
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
         self.embeddings = None

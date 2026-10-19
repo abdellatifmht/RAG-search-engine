@@ -63,8 +63,8 @@ The project currently pins or constrains its Python dependencies in
 Clone the repository and enter the project directory:
 
 ```bash
-git clone https://github.com/<your-username>/<your-repository>.git
-cd <your-repository>
+git clone https://github.com/abdellatifmht/RAG-search-engine.git
+cd RAG-search-engine
 ```
 
 Create the environment and install dependencies with `uv`:

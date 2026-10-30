@@ -307,6 +307,3 @@ when evaluating a different catalogue.
 2. Make focused changes and document new commands or configuration.
 3. Run the relevant CLI command or evaluation before opening a pull request.
 4. Do not commit API keys, `.env`, generated caches, or private datasets.
-
-
-[![Boot.dev Learn Retrieval Augmented Generation certificate](https://qvault-webapp-dynamic-assets.storage.googleapis.com/certificates/0d23b904-07bc-4e7e-b0e3-ea7077ddbc39.jpeg?v=1792347782)](https://www.boot.dev/certificates/0d23b904-07bc-4e7e-b0e3-ea7077ddbc39)
